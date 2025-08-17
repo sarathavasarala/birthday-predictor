@@ -48,6 +48,9 @@ uploads/
 *.txt
 !requirements.txt
 
+# Test files with sensitive data
+test_parser.py
+
 # OS files
 .DS_Store
 .DS_Store?
