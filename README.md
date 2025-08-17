@@ -15,7 +15,7 @@ A Python Flask application that analyzes WhatsApp chat exports to automatically 
 - **Confidence Scoring**: Provides reliability metrics for each prediction
 
 ### 🔍 **Multi-Strategy Detection**
-- **Phone Number Mentions**: `@911234567889` style references
+- **Phone Number Mentions**: `@1234567890` style references
 - **Name Pattern Matching**: Direct name mentions in wishes
 - **Thank You Analysis**: Identifies recipients through responses
 - **Process of Elimination**: Smart inference for group chats
