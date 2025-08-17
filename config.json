@@ -106,6 +106,16 @@
     "min_wishers": 1,
     "min_wish_score": 0.1
   },
+  "llm": {
+    "deployment_name": "gpt-4.1",
+    "max_messages_per_request": 10,
+    "max_tokens": 1500,
+    "temperature": 0.7,
+    "api_version": "2025-01-01-preview",
+    "rate_limit_delay": 2.0,
+    "max_retries": 3,
+    "retry_delay": 5.0
+  },
   "logging": {
     "level": "INFO",
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",

@@ -47,6 +47,88 @@
             </div>
         </div>
 
+        <!-- Progress Modal -->
+        <div class="modal fade" id="progressModal" tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="progressModalLabel">
+                            <i class="fas fa-cogs me-2"></i>
+                            Processing Your Files
+                        </h5>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <div class="progress" style="height: 25px;">
+                                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                    0%
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-tasks me-2"></i>Current Task:</h6>
+                                <p id="currentTask" class="text-muted">Initializing...</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-clock me-2"></i>Status:</h6>
+                                <p id="progressStatus" class="text-muted">Starting...</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h6><i class="fas fa-list me-2"></i>Recent Activity:</h6>
+                            <div id="activityLog" class="border rounded p-3" style="height: 200px; overflow-y: auto; background-color: #f8f9fa;">
+                                <div class="text-muted">Waiting for updates...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3 text-center">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Please don't close this window. Processing may take a few minutes depending on file size.
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="cancelBtn" disabled>
+                            <i class="fas fa-times me-2"></i>
+                            Cancel
+                        </button>
+                        <button type="button" class="btn btn-success" id="viewResultsBtn" style="display: none;" onclick="window.location.href='/results'">
+                            <i class="fas fa-eye me-2"></i>
+                            View Results
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LLM Status -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6 class="card-title">
+                    <i class="fas fa-robot me-2"></i>
+                    AI Analysis Status
+                </h6>
+                {% if llm_status.available %}
+                <div class="alert alert-success mb-0">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>AI Analysis Enabled</strong> - Using {{ llm_status.deployment }} for enhanced birthday detection
+                    <br><small class="text-muted">The system will analyze messages intelligently to identify birthday persons with high accuracy.</small>
+                </div>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>AI Analysis Disabled</strong> - Basic pattern matching will be used
+                    <br><small class="text-muted">For enhanced results, configure Azure OpenAI credentials (AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT).</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Instructions -->
         <div class="card mt-4">
             <div class="card-body">
@@ -189,10 +271,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Form submission with loading state
-    uploadForm.addEventListener('submit', function() {
+    // Form submission with progress modal
+    uploadForm.addEventListener('submit', function(e) {
+        // Update UI to show processing state
         uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
         uploadBtn.disabled = true;
+        
+        // Let the form submit normally - it will redirect to processing page
+        return true;
     });
 });
 </script>

@@ -1,14 +1,25 @@
 """
 Main Flask application for WhatsApp Birthday Detection.
 Provides web interface for uploading files and viewing results.
+
+TODO: Add Google Calendar integration
+- Create birthday events from detected birthdays
+- Use Google Calendar API to schedule recurring events
+- Add user authentication and calendar permission flow
+- Allow users to select which birthdays to add to calendar
 """
 
 import os
 import json
+import time
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from dotenv import load_dotenv
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, Response
 from werkzeug.utils import secure_filename
+
+# Load environment variables from .env file
+load_dotenv()
 
 from logging_config import setup_logging, get_logger, LoggedOperation
 from models import DatabaseManager
@@ -16,6 +27,8 @@ from parser import WhatsAppParser
 from analyzer import BirthdayAnalyzer
 from identity import IdentityResolver
 from confidence import ConfidenceScorer
+from llm_parser import llm_parser
+from progress_tracker import progress_tracker
 
 # Initialize logging
 setup_logging()
@@ -52,12 +65,19 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     """Main upload page."""
-    return render_template('index.html')
+    llm_status = {
+        'available': llm_parser.is_available(),
+        'deployment': llm_parser.deployment_name if llm_parser.is_available() else None
+    }
+    return render_template('index.html', llm_status=llm_status)
 
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
-    """Handle file upload and processing."""
+    """Handle file upload and redirect to processing page."""
+    import uuid
+    session_id = str(uuid.uuid4())
+    
     with LoggedOperation("Processing uploaded files", 'app'):
         try:
             # Check if files were uploaded
@@ -71,180 +91,290 @@ def upload_files():
                 flash('No files selected', 'error')
                 return redirect(url_for('index'))
             
-            # Process each file
-            processed_files = []
-            all_clusters = []
-            all_participants = []
-            all_messages = []  # Collect all messages for later use
-            
+            # Save uploaded files first
+            uploaded_files = []
             for file in files:
                 if file and file.filename and allowed_file(file.filename):
-                    try:
-                        # Save uploaded file
-                        filename = secure_filename(file.filename)
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        filename = f"{timestamp}_{filename}"
-                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                        file.save(file_path)
-                        
-                        # Process the file
-                        chat, messages, participants = parser.parse_file(file_path)
-                        
-                        # Save to database
-                        chat_id = db_manager.save_chat(chat)
-                        
-                        # Update message and participant chat_ids
-                        for msg in messages:
-                            msg.chat_id = chat_id
-                        for participant in participants:
-                            participant.chat_id = chat_id
-                        
-                        # Save messages
-                        message_ids = db_manager.save_messages(messages)
-                        
-                        # Update message IDs
-                        for i, msg in enumerate(messages):
-                            msg.id = message_ids[i]
-                        
-                        # Analyze messages for birthday wishes
-                        wish_messages = analyzer.analyze_messages(messages)
-                        
-                        if wish_messages:
-                            # Cluster wishes by date
-                            clusters = analyzer.cluster_wishes_by_date(messages, wish_messages, chat_id)
-                            
-                            # Infer targets for each cluster
-                            for cluster in clusters:
-                                target_id = analyzer.infer_birthday_target(
-                                    cluster, participants, messages, chat.chat_type.value
-                                )
-                                cluster.target_participant_id = target_id
-                                
-                                # Adjust birthday date if needed
-                                cluster.date = analyzer.adjust_birthday_date(cluster, messages)
-                            
-                            # Filter clusters with identified targets
-                            valid_clusters = clusters  # Show all clusters, not just those with identified targets
-                            all_clusters.extend(valid_clusters)
-                            all_participants.extend(participants)
-                            all_messages.extend(messages)  # Collect messages for later use
-                            
-                            logger.info(f"Processed {filename}: {len(valid_clusters)} valid clusters")
-                        
-                        processed_files.append({
-                            'filename': file.filename,
-                            'status': 'success',
-                            'clusters': len([c for c in all_clusters if c.chat_id == chat_id]),
-                            'participants': len(participants)
-                        })
-                        
-                    except Exception as e:
-                        logger.error(f"Error processing file {file.filename}: {str(e)}", exc_info=True)
-                        processed_files.append({
-                            'filename': file.filename,
-                            'status': 'error',
-                            'error': str(e)
-                        })
-                else:
-                    flash(f'Invalid file type: {file.filename}. Only .txt files are allowed.', 'error')
+                    filename = secure_filename(file.filename)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"{timestamp}_{filename}"
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(file_path)
+                    uploaded_files.append({
+                        'original_name': file.filename,
+                        'file_path': file_path
+                    })
             
-            if not all_clusters:
-                flash('No birthday wishes found in the uploaded files.', 'warning')
+            if not uploaded_files:
+                flash('No valid files uploaded. Only .txt files are allowed.', 'error')
                 return redirect(url_for('index'))
             
-            # Create simple birthday summaries from clusters - skip complex identity resolution
-            birthday_summaries = []
-            for cluster in all_clusters:
-                # Extract mentioned names and phone numbers from the cluster
-                mentioned_names = []
-                phone_mentions = []
-                
-                for wish in cluster.wish_messages:
-                    for mention in wish.mentioned_names:
-                        if mention.startswith('@') and mention[1:].isdigit():
-                            phone_mentions.append(mention)
-                        elif mention and len(mention) > 1 and mention.lower() not in ['recognise', 'wish', 'happy', 'birthday']:
-                            mentioned_names.append(mention)
-                
-                # Get unique mentions
-                unique_names = list(set(mentioned_names))
-                unique_phones = list(set(phone_mentions))
-                
-                # Try to get target name if available
-                target_name = "Someone's Birthday"
-                target_info = "Unknown"
-                
-                # Try different strategies to find the target name
-                if cluster.target_participant_id:
-                    target_participant = next((p for p in all_participants if p.id == cluster.target_participant_id), None)
-                    if target_participant:
-                        target_name = target_participant.display_name or f"Contact {target_participant.phone}"
-                        target_info = target_name
-                
-                # If no target found, try to infer from mentions
-                if target_name == "Someone's Birthday" and unique_names:
-                    target_name = unique_names[0]  # Use first mentioned name
-                    target_info = f"{unique_names[0]}"
-                
-                # Fall back to phone if available
-                if target_name == "Someone's Birthday" and unique_phones:
-                    target_name = f"Contact {unique_phones[0]}"
-                    target_info = unique_phones[0]
+            # Store upload info in session
+            session['uploaded_files'] = uploaded_files
+            session['progress_session_id'] = session_id
+            
+            # Start background processing
+            import threading
+            thread = threading.Thread(target=process_files_background, args=(session_id, uploaded_files))
+            thread.daemon = True
+            thread.start()
+            
+            # Redirect to processing page
+            return redirect(url_for('process_page'))
+            
+        except Exception as e:
+            logger.error(f"Unexpected error in upload_files: {str(e)}", exc_info=True)
+            flash(f'Error processing upload: {str(e)}', 'error')
+            return redirect(url_for('index'))
 
-                # Create simple summary that matches template expectations
-                summary = {
-                    'canonical_name': target_name,
-                    'name': target_name,  # Backup field
-                    'target': target_info,  # For display in template
-                    'birthday_date': cluster.date.strftime("%m-%d"),
-                    'birthday_month': cluster.date.month,
-                    'birthday_day': cluster.date.day,
-                    'birthday_year': cluster.date.year,
-                    'full_date': cluster.date.strftime("%B %d, %Y"),
-                    'year': cluster.date.year,
-                    'years_observed': 1,
-                    'total_wishers': cluster.unique_wishers or 0,
-                    'wisher_count': cluster.unique_wishers or 0,  # Template expects this field
-                    'wishers': cluster.unique_wishers or 0,  # Additional field for compatibility
-                    'total_wishes': len(cluster.wish_messages),
-                    'mentioned_names': unique_names[:3],  # Top 3 mentioned names
-                    'phone_mentions': unique_phones[:2],  # Top 2 phone mentions
-                    'messages': [{'sender': msg.sender, 'content': msg.text[:50], 'timestamp': msg.timestamp.strftime("%H:%M")} 
-                               for wish in cluster.wish_messages[:5]  # Show first 5 messages only
-                               for msg in all_messages if msg.id == wish.message_id][:5],  # Limit to 5 messages max
-                    'confidence': 0.7 if cluster.target_participant_id else 0.4  # As decimal for template
-                }
-                birthday_summaries.append(summary)
+
+def process_files_background(session_id, uploaded_files):
+    """Process files in background thread with progress updates."""
+    try:
+        # Initialize progress tracking
+        total_files = len(uploaded_files)
+        progress_tracker.start_session(session_id, total_files * 3, "Processing WhatsApp files")
+        
+        # Process each file
+        processed_files = []
+        all_clusters = []
+        all_participants = []
+        all_messages = []
+        current_step = 0
+        
+        for file_index, file_info in enumerate(uploaded_files):
+            try:
+                current_step += 1
+                progress_tracker.update_progress(
+                    session_id, current_step, 
+                    f"Parsing file: {file_info['original_name']}"
+                )
+                
+                # Process the file
+                chat, messages, participants = parser.parse_file(file_info['file_path'])
+                
+                current_step += 1
+                progress_tracker.update_progress(
+                    session_id, current_step, 
+                    f"Analyzing messages from {file_info['original_name']}"
+                )
+                
+                # Save to database
+                chat_id = db_manager.save_chat(chat)
+                
+                # Update message and participant chat_ids
+                for msg in messages:
+                    msg.chat_id = chat_id
+                for participant in participants:
+                    participant.chat_id = chat_id
+                
+                # Save messages
+                message_ids = db_manager.save_messages(messages)
+                
+                # Update message IDs
+                for i, msg in enumerate(messages):
+                    msg.id = message_ids[i]
+                
+                # Analyze messages for birthday wishes
+                wish_messages = analyzer.analyze_messages(messages)
+                
+                if wish_messages:
+                    # Cluster wishes by date
+                    clusters = analyzer.cluster_wishes_by_date(messages, wish_messages, chat_id)
+                    
+                    # Infer targets for each cluster
+                    for cluster in clusters:
+                        target_id = analyzer.infer_birthday_target(
+                            cluster, participants, messages, chat.chat_type.value
+                        )
+                        cluster.target_participant_id = target_id
+                        
+                        # Adjust birthday date if needed
+                        cluster.date = analyzer.adjust_birthday_date(cluster, messages)
+                    
+                    # Filter clusters with identified targets
+                    valid_clusters = clusters  # Show all clusters, not just those with identified targets
+                    all_clusters.extend(valid_clusters)
+                    all_participants.extend(participants)
+                    all_messages.extend(messages)
+                    
+                    logger.info(f"Processed {file_info['original_name']}: {len(valid_clusters)} valid clusters")
+                
+                processed_files.append({
+                    'filename': file_info['original_name'],
+                    'status': 'success',
+                    'clusters': len([c for c in all_clusters if c.chat_id == chat_id]),
+                    'participants': len(participants)
+                })
+                
+            except Exception as e:
+                logger.error(f"Error processing file {file_info['original_name']}: {str(e)}", exc_info=True)
+                processed_files.append({
+                    'filename': file_info['original_name'],
+                    'status': 'error',
+                    'error': str(e)
+                })
+        
+        if not all_clusters:
+            progress_tracker.complete_session(session_id, success=False, error="No birthday wishes found in the uploaded files.")
+            return
+        
+        # Update progress for LLM analysis phase
+        progress_tracker.update_progress(
+            session_id, current_step + 1,
+            f"Starting AI analysis of {len(all_clusters)} birthday clusters"
+        )
+        
+        # Create simple birthday summaries from clusters using LLM analysis
+        birthday_summaries = []
+        for cluster_index, cluster in enumerate(all_clusters):
+            # Update progress for each cluster
+            progress_tracker.update_progress(
+                session_id, current_step + 2 + cluster_index,
+                f"Analyzing birthday cluster {cluster.date.strftime('%m-%d')}...",
+                f"Processing cluster {cluster_index + 1}/{len(all_clusters)}"
+            )
             
-            # Sort by date (most recent first)
-            birthday_summaries.sort(key=lambda x: (x['year'], x['birthday_month'], x['birthday_day']), reverse=True)
+            # Get cluster messages for LLM analysis
+            cluster_messages = [msg for msg in all_messages if any(wish.message_id == msg.id for wish in cluster.wish_messages)]
             
-            # Store for results page using session (simpler than database)
-            session['birthday_results'] = birthday_summaries
-            session['processing_summary'] = {
+            # Use LLM parser to analyze the cluster
+            llm_result = llm_parser.analyze_birthday_cluster(cluster, cluster_messages)
+            
+            # Update progress with results
+            person = llm_result.get('person', 'Unknown')
+            confidence = llm_result.get('confidence', 40)
+            progress_tracker.update_progress(
+                session_id, current_step + 2 + cluster_index,
+                f"✅ Identified: {person} ({confidence}% confidence)",
+                f"Birthday: {cluster.date.strftime('%m-%d')}, Person: {person}"
+            )
+            
+            # Create comprehensive summary
+            summary = {
+                'canonical_name': llm_result.get('person') or f"Birthday {cluster.date.strftime('%m-%d')}",
+                'name': llm_result.get('person') or "Unknown",
+                'target': llm_result.get('person') or "Unknown",
+                'birthday_date': llm_result.get('date', cluster.date.strftime("%m-%d")),
+                'birthday_month': cluster.date.month,
+                'birthday_day': cluster.date.day,
+                'birthday_year': llm_result.get('year') or cluster.date.year,
+                'full_date': cluster.date.strftime("%B %d, %Y"),
+                'year': llm_result.get('year') or cluster.date.year,
+                'years_observed': 1,
+                'total_wishers': cluster.unique_wishers or 0,
+                'wisher_count': cluster.unique_wishers or 0,
+                'wishers': cluster.unique_wishers or 0,
+                'total_wishes': len(cluster.wish_messages),
+                'phone_number': llm_result.get('phone_number'),
+                'messages': [
+                    {
+                        'sender': msg.sender, 
+                        'content': msg.text[:100],  # First 100 chars
+                        'timestamp': msg.timestamp.strftime("%H:%M")
+                    } 
+                    for msg in cluster_messages[:5]  # First 5 messages
+                ],
+                'confidence': llm_result.get('confidence', 40) / 100,  # Convert percentage to decimal for template
+                'confidence_percent': llm_result.get('confidence', 40),  # Keep percentage for display
+                'llm_analysis': llm_result.get('analysis', 'No analysis available'),
+                'llm_source': llm_result.get('source', 'unknown'),
+                'message_count': len(cluster_messages)
+            }
+            birthday_summaries.append(summary)
+        
+        # Sort by date (most recent first)
+        birthday_summaries.sort(key=lambda x: (x['year'], x['birthday_month'], x['birthday_day']), reverse=True)
+        
+        # Store results temporarily (in a simple in-memory cache)
+        global processing_results
+        if 'processing_results' not in globals():
+            processing_results = {}
+        
+        processing_results[session_id] = {
+            'birthday_results': birthday_summaries,
+            'processing_summary': {
                 'total_files': len(processed_files),
                 'successful_files': len([f for f in processed_files if f['status'] == 'success']),
                 'total_clusters': len(all_clusters),
                 'total_predictions': len(birthday_summaries),
                 'processing_time': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
-            
-            flash(f'Successfully processed {len(processed_files)} files. Found {len(birthday_summaries)} birthday predictions.', 'success')
-            return redirect(url_for('results'))
-            
-        except Exception as e:
-            logger.error(f"Unexpected error in upload_files: {str(e)}", exc_info=True)
-            flash('An unexpected error occurred while processing your files.', 'error')
-            return redirect(url_for('index'))
+        }
+        
+        # Complete progress tracking
+        progress_tracker.complete_session(session_id, success=True)
+        
+    except Exception as e:
+        logger.error(f"Background processing error: {str(e)}", exc_info=True)
+        progress_tracker.complete_session(session_id, success=False, error=str(e))
 
+
+@app.route('/process')
+def process_page():
+    """Show processing page with live progress."""
+    session_id = session.get('progress_session_id')
+    if not session_id:
+        flash('No active processing session found.', 'error')
+        return redirect(url_for('index'))
+    
+    return render_template('process.html', session_id=session_id)
+
+@app.route('/progress/<session_id>')
+def progress_stream(session_id):
+    """Stream progress updates via Server-Sent Events."""
+    def generate():
+        # Set up SSE headers
+        yield "data: " + json.dumps({"status": "connected", "message": "Connection established"}) + "\n\n"
+        
+        # Stream progress updates
+        while True:
+            progress = progress_tracker.get_progress(session_id)
+            if not progress:
+                yield f"data: {json.dumps({'error': 'Session not found'})}\n\n"
+                break
+            
+            # Send progress update
+            yield f"data: {json.dumps(progress, default=str)}\n\n"
+            
+            # Stop streaming if completed or errored
+            if progress['status'] in ['completed', 'error']:
+                break
+            
+            # Wait before next update
+            import time
+            time.sleep(0.5)  # Update every 500ms
+    
+    return Response(generate(), mimetype='text/event-stream', headers={
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+    })
 
 @app.route('/results')
 def results():
     """Display results page."""
     try:
-        # Get results from session instead of database
-        birthday_results = session.get('birthday_results', [])
-        processing_summary = session.get('processing_summary', {})
+        # Get results from session or global storage
+        session_id = session.get('progress_session_id')
+        
+        # Try to get from global storage first
+        birthday_results = []
+        processing_summary = {}
+        
+        if session_id and 'processing_results' in globals() and session_id in processing_results:
+            data = processing_results[session_id]
+            birthday_results = data.get('birthday_results', [])
+            processing_summary = data.get('processing_summary', {})
+            
+            # Also store in session for future use
+            session['birthday_results'] = birthday_results
+            session['processing_summary'] = processing_summary
+        else:
+            # Fallback to session storage
+            birthday_results = session.get('birthday_results', [])
+            processing_summary = session.get('processing_summary', {})
         
         if not birthday_results:
             flash('No results found. Please upload WhatsApp chat files first.', 'info')
