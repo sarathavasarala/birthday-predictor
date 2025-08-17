@@ -35,8 +35,6 @@
 
 ### Successfully Implemented Features:
 - **WhatsApp Export Parser**: Handles multiple Android/iOS formats with configurable patterns
-- **Birthday Wish Detection**: AI-powered analysis with 313 wishes detected from real chat data  
-- **Smart Clustering**: Groups wishes by date with 27 clusters identified across multiple years
 - **Target Inference**: Identifies birthday recipients using phone mentions, name analysis, and thanks detection
 - **Identity Resolution**: Links mentions across chats to build comprehensive profiles
 - **Confidence Scoring**: Provides reliability metrics with user-friendly thresholds
@@ -46,8 +44,6 @@
 
 ### Real-World Validation:
 - Tested with actual WhatsApp export containing 1,449 messages from 41 participants
-- Successfully detected 27 birthday clusters spanning from 2024-2025
-- Handles various message formats including "MS - Name" prefixes and phone mentions
 - Gracefully manages ambiguous cases and provides meaningful results even with low confidence
 
 ### Configuration Highlights:
