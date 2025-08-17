@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Birthday Predictions - WhatsApp Birthday Detector{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-birthday-cake text-primary me-2"></i>
+                Birthday Predictions
+            </h2>
+            <div>
+                <a href="{{ url_for('export_csv') }}" class="btn btn-outline-success me-2">
+                    <i class="fas fa-download me-1"></i>
+                    Export CSV
+                </a>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>
+                    Upload More Files
+                </a>
+            </div>
+        </div>
+
+        {% if identities %}
+            <!-- Summary Stats -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h3 class="text-primary">{{ identities|length }}</h3>
+                            <p class="card-text">Total Predictions</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h3 class="text-success">{{ identities|selectattr('confidence', 'ge', 0.5)|list|length }}</h3>
+                            <p class="card-text">Good Confidence</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h3 class="text-info">{{ identities|map(attribute='wisher_count', default=0)|sum }}</h3>
+                            <p class="card-text">Total Wishers</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Birthday Predictions Table -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Name</th>
+                            <th>Birthday</th>
+                            <th>Wishers</th>
+                            <th>Target Info</th>
+                            <th>Confidence</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for identity in identities %}
+                        <tr>
+                            <td>
+                                <strong>{{ identity.canonical_name or 'Unknown' }}</strong>
+                                {% if identity.confidence >= 0.5 %}
+                                    <span class="badge bg-success ms-2">Good</span>
+                                {% else %}
+                                    <span class="badge bg-secondary ms-2">Low</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <i class="fas fa-calendar-alt text-primary me-1"></i>
+                                {% if identity.birthday_date %}
+                                    {{ identity.birthday_date }}
+                                    {% set month_names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] %}
+                                    <small class="text-muted">({{ month_names[identity.birthday_month] }} {{ identity.birthday_day }})</small>
+                                {% else %}
+                                    Unknown
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ identity.wisher_count or identity.total_wishers or 0 }}</span>
+                                <small class="text-muted">wishers</small>
+                            </td>
+                            <td>
+                                {% if identity.target and identity.target != 'Unknown' %}
+                                    <span class="text-success">{{ identity.target }}</span>
+                                {% else %}
+                                    <span class="text-muted">Unknown</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="progress" style="height: 20px; width: 100px;">
+                                    <div class="progress-bar {% if identity.confidence >= 0.5 %}bg-success{% else %}bg-warning{% endif %}" 
+                                         style="width: {{ (identity.confidence * 100)|round }}%">
+                                        {{ "%.0f"|format(identity.confidence * 100) }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#details-{{ loop.index }}" 
+                                        aria-expanded="false">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Details
+                                </button>
+                            </td>
+                        </tr>
+                        <!-- Collapsible Row for Details -->
+                        <tr class="collapse" id="details-{{ loop.index }}">
+                            <td colspan="6">
+                                <div class="card card-body bg-light">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6>Birthday Information:</h6>
+                                            <ul class="small mb-2">
+                                                <li><strong>Date:</strong> {{ identity.birthday_date or 'Unknown' }}</li>
+                                                <li><strong>Year:</strong> {{ identity.birthday_year or 'Unknown' }}</li>
+                                                <li><strong>Target:</strong> {{ identity.target or 'Unknown' }}</li>
+                                                <li><strong>Confidence:</strong> {{ "%.1f"|format(identity.confidence * 100) }}%</li>
+                                                <li><strong>Total Wishes:</strong> {{ identity.total_wishes or 0 }}</li>
+                                                <li><strong>Wishers:</strong> {{ identity.wisher_count or identity.total_wishers or 0 }}</li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6>Birthday Messages:</h6>
+                                            {% if identity.messages %}
+                                                <div class="message-list" style="max-height: 200px; overflow-y: auto;">
+                                                    {% for message in identity.messages[:5] %}
+                                                    <div class="message-item p-2 border-bottom">
+                                                        <strong>{{ message.sender }}:</strong>
+                                                        <span class="text-muted small">({{ message.timestamp }})</span><br>
+                                                        <span>{{ message.content[:100] }}{% if message.content|length > 100 %}...{% endif %}</span>
+                                                    </div>
+                                                    {% endfor %}
+                                                    {% if identity.messages|length > 5 %}
+                                                    <small class="text-muted">... and {{ identity.messages|length - 5 }} more messages</small>
+                                                    {% endif %}
+                                                </div>
+                                            {% else %}
+                                                <p class="text-muted small">No messages available</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h4>No birthday predictions found</h4>
+                <p class="text-muted">Upload some WhatsApp chat exports to get started.</p>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    <i class="fas fa-upload me-2"></i>
+                    Upload Files
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
