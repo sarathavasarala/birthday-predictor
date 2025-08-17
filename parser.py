@@ -480,8 +480,8 @@ class WhatsAppParser:
         # Patterns for phone mentions
         mention_patterns = [
             r'@(\d{10,15})',  # @1234567890
-            r'@([+]\d{1,3}\d{10,12})',  # @+1234567890
-            r'([+]\d{1,3}\s?\d{5}\s?\d{5})',  # +91 12345.*67890
+            r'@([+]\d{1,3}\d{10,12})',  # @+911234567890
+            r'([+]\d{1,3}\s?\d{5}\s?\d{5})',  # +91 12345 67890
         ]
         
         for pattern in mention_patterns:

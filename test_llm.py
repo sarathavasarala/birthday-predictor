@@ -79,7 +79,7 @@ def test_birthday_analysis():
         Message(
             id=3,
             sender="Charlie",
-            text="Sarath, wishing you a very happy birthday! +91 12345.*67890",
+            text="Sarath, wishing you a very happy birthday! +91 12345 67890",
             timestamp=datetime(2024, 8, 1, 12, 0)
         ),
         Message(
