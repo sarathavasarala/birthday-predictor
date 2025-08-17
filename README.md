@@ -1,52 +1,68 @@
-# 🎂 WhatsApp Birthday Detector
+# 🎂 WhatsApp Birthday Predictor
 
-A sophisticated Python Flask application that analyzes WhatsApp chat exports to automatically detect and predict birthdays using AI-powered pattern recognition.
+A Python Flask application that analyzes WhatsApp chat exports to automatically detect and predict birthdays using some rules + LLMs.
 
-## ✨ Features
+![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
+![Flask](https://img.shields.io/badge/flask-v2.3+-green.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-### 🔍 **Smart Analysis**
-- **WhatsApp Export Parser**: Supports multiple Android/iOS export formats
-- **AI Birthday Detection**: Identifies birthday wishes with confidence scoring
-- **Intelligent Clustering**: Groups wishes by date with configurable time windows
-- **Target Inference**: Determines who the birthday wishes are for using:
-  - Phone number mentions (@919545598844)
-  - Name pattern matching
-  - Thanks message analysis
-  - Process of elimination
+## ✨ Key Features
 
-### 🎯 **Real-World Tested**
-- Successfully analyzed 1,449 messages from 41 participants
-- Detected 27 birthday clusters across 2024-2025
-- Handles various message formats and ambiguous cases
-- Provides meaningful results even with incomplete data
+### 🤖 **AI-Powered Analysis**
+- **Azure OpenAI Integration**: Uses GPT.4-1 (or any other model) for intelligent message analysis
+- **Pattern Recognition**: Detects birthday wishes with sophisticated scoring
+- **Smart Clustering**: Groups related messages across time windows
+- **Confidence Scoring**: Provides reliability metrics for each prediction
 
-### 🛠 **Technical Features**
-- **Modular Architecture**: Separate components for parsing, analysis, identity resolution
-- **Configurable Patterns**: JSON-based configuration for different WhatsApp formats
-- **Comprehensive Logging**: Detailed logging for debugging and monitoring
-- **SQLite Database**: Persistent storage with full schema support
-- **Web Interface**: Clean Flask app with Bootstrap styling
+### 🔍 **Multi-Strategy Detection**
+- **Phone Number Mentions**: `@911234567889` style references
+- **Name Pattern Matching**: Direct name mentions in wishes
+- **Thank You Analysis**: Identifies recipients through responses
+- **Process of Elimination**: Smart inference for group chats
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.8+
-- pip (Python package manager)
+- Azure OpenAI API access (for AI analysis)
 
 ### Installation
 
-1. **Clone or download the project**
+1. **Clone the repository**
 ```bash
-cd "HBD App"
+git clone https://github.com/sarathavasarala/birthday-predictor.git
+cd birthday-predictor
 ```
 
-2. **Run the application**
+2. **Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+3. **Set up environment variables**
+```bash
+cp .env.example .env
+# Edit .env with your Azure OpenAI credentials
+```
+
+4. **Run the application**
 ```bash
 python app.py
 ```
 
-3. **Open your browser**
+5. **Open your browser**
 Navigate to: `http://127.0.0.1:5001`
+
+## ⚙️ Environment Setup
+
+Create a `.env` file with your Azure OpenAI credentials:
+
+```env
+AZURE_OPENAI_API_KEY=your_api_key_here
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT=gpt-4
+AZURE_OPENAI_API_VERSION=2025-01-01-preview
+```
 
 ## 📱 How to Export WhatsApp Chats
 
@@ -62,151 +78,102 @@ Navigate to: `http://127.0.0.1:5001`
 
 ## 🎯 Usage
 
-1. **Upload WhatsApp Export**: Drag and drop or select your .txt file
-2. **Processing**: The app will automatically:
-   - Parse messages and identify participants
-   - Detect birthday wishes using AI patterns
-   - Cluster wishes by date
-   - Infer who the birthdays are for
-   - Calculate confidence scores
+1. **Upload WhatsApp Export**: Drag and drop your .txt file
+2. **Watch Real-Time Processing**: See AI analysis progress live
+3. **Review Results**: Explore predictions with detailed explanations
+4. **Export Birthdays**: Use results to update your calendar
 
-3. **View Results**: See discovered birthdays with:
-   - Date and person's name
-   - Confidence percentage
-   - Number of wishers
-   - Years of evidence
+## 🏗 Architecture
 
-## ⚙️ Configuration
+```
+📁 Project Structure
+├── app.py              # Main Flask application & API endpoints
+├── parser.py           # WhatsApp export parsing engine
+├── analyzer.py         # Birthday detection & clustering logic
+├── llm_parser.py       # Azure OpenAI integration & AI analysis
+├── identity.py         # Cross-chat identity resolution
+├── confidence.py       # Confidence scoring algorithms
+├── progress_tracker.py # Real-time progress tracking
+├── models.py          # Database models & operations
+├── config.json        # Configuration & patterns
+├── templates/         # HTML templates
+└── static/           # CSS, JS, images
+```
 
-The app uses `config.json` for customization:
+## 🤖 AI Analysis Features
 
-### Key Settings:
+### Intelligent Message Analysis
+- **Context Understanding**: AI comprehends birthday wish patterns
+- **Person Identification**: Smart extraction of recipient names
+- **Confidence Assessment**: Reliability scoring for each prediction
+- **Explanation Generation**: Clear reasoning for each decision
+
+### Real-Time Feedback
+- **Progress Tracking**: Live updates during processing
+- **Activity Logging**: See "✅ Identified: Sarah (95% confidence)"
+- **Transparent AI**: Understand why AI made each prediction
+
+## 🔧 Configuration
+
+Customize behavior in `config.json`:
+
 ```json
 {
   "confidence": {
-    "min_threshold": 0.3,  // 30% minimum confidence
-    "base_score": 0.3      // Starting confidence score
+    "min_threshold": 0.3  // 30% minimum confidence
   },
   "clustering": {
-    "window_hours": 36,    // Group wishes within 36 hours
-    "min_wish_score": 0.1  // Minimum wish quality
+    "window_hours": 36,   // Group wishes within 36 hours
+    "min_wishers": 1      // Minimum wishers per cluster
+  },
+  "llm": {
+    "deployment_name": "gpt-4",
+    "rate_limit_delay": 2.0  // Rate limiting for API calls
   }
 }
 ```
 
-### Supported Export Formats:
-- Android: `4/26/25, 3:10 PM - Name: Message`
-- iOS: `[4/26/25, 3:10:45 PM] Name: Message`
-- Various name prefixes: `MS - Name`, `+91 Phone Number`
-
-## 📊 Example Results
-
-After processing a real WhatsApp group chat:
-- **1,449 messages** analyzed from 41 participants
-- **27 birthday clusters** detected spanning 2024-2025
-- **Multiple identification strategies** used for accuracy
-
-Sample output:
-```
-🎂 Rohit
-   📅 Birthday: 4/26
-   📱 Phone: +919545598844
-   🎯 Confidence: 75.0%
-   👥 Evidence: 18 wishers
-```
-
-## 🔍 How It Works
-
-### 1. **Parsing**
-- Detects WhatsApp export format automatically
-- Extracts messages, timestamps, and participant info
-- Handles various date formats and name patterns
-
-### 2. **Wish Detection**
-- Scans for birthday-related keywords and phrases
-- Analyzes emojis and patterns (🎂, 🎉, "happy birthday")
-- Scores each message for birthday relevance
-
-### 3. **Clustering**
-- Groups wishes occurring within 36 hours
-- Creates birthday event clusters
-- Handles multi-day celebrations
-
-### 4. **Target Inference**
-- **Phone mentions**: @919545598844 style references
-- **Name analysis**: Mentioned names in wishes
-- **Thanks detection**: Who responded with thanks
-- **Elimination**: Process of elimination in small groups
-
-### 5. **Identity Resolution**
-- Links mentions across different chats
-- Builds comprehensive identity profiles
-- Resolves aliases and variations
-
-## 🛠 Architecture
+## 📊 Example Output
 
 ```
-📁 Project Structure
-├── app.py              # Main Flask application
-├── parser.py           # WhatsApp export parsing
-├── analyzer.py         # Birthday wish detection & clustering  
-├── identity.py         # Identity resolution across chats
-├── confidence.py       # Confidence scoring algorithms
-├── models.py          # Data models & database operations
-├── config.json        # Configuration settings
-├── logging_config.py  # Logging setup
-├── templates/         # HTML templates
-│   ├── base.html     # Base template
-│   ├── index.html    # Upload page
-│   └── results.html  # Results display
-└── static/           # CSS, JS, images
+🎂 Sarah Johnson
+   📅 Birthday: January 24th
+   🎯 Confidence: 95%
+   📱 Phone: +1234567890
+   👥 Wishers: 8 people
+   🤖 AI Analysis: "Multiple messages directly mention 'Happy Birthday Sarah' 
+      with high certainty. Phone number @1234567890 consistently referenced."
 ```
 
-## 📝 Logging
+## 🛠 Development
 
-Comprehensive logging helps track the analysis process:
-- **INFO**: General progress and results
-- **DEBUG**: Detailed analysis steps
-- **WARNING**: Ambiguous cases and fallbacks
-- **ERROR**: Processing issues
+### Running Tests
+```bash
+python test_parser.py
+python test_llm.py
+```
 
-Logs are saved to `logs/hbd_app.log` with automatic rotation.
+### Debug Mode
+Set `DEBUG = True` in app.py for detailed logging.
 
-## 🐛 Troubleshooting
+## 🤝 Contributing
 
-### Common Issues:
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-**"No birthday wishes found"**
-- Check if the chat file has birthday-related messages
-- Verify the export format is supported
-- Try lowering confidence thresholds in config.json
+## 📄 License
 
-**"Port already in use"**
-- Kill existing Python processes: `pkill -f "python.*app.py"`
-- Or change the port in app.py: `app.run(debug=True, port=5002)`
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-**"Invalid file format"**
-- Ensure you're uploading a .txt file
-- Check the export was done "without media"
-- Verify the file contains properly formatted WhatsApp messages
+## 🙏 Acknowledgments
 
-### Debug Mode:
-Set logging level to DEBUG in `config.json` for detailed analysis information.
-
-## 🎉 Success Stories
-
-Real-world validation with actual WhatsApp group chat:
-- **41 participants** in active group chat
-- **Multiple years** of birthday data (2024-2025)
-- **High accuracy** with phone number mentions
-- **Graceful handling** of ambiguous cases
-
-The system successfully identified patterns like:
-- `@919545598844` phone mentions linking to "Rohit"
-- `MS - Name` prefix patterns from Android exports
-- Multi-day birthday celebrations
-- Thank you responses confirming birthday recipients
+- Built with Flask and Bootstrap for clean UI
+- Powered by Azure OpenAI for intelligent analysis
+- Inspired by the need to never miss a birthday again!
 
 ---
 
-**Made with ❤️ for birthday celebration automation**
+**⭐ Star this repo if it helped you catch up on birthdays!**

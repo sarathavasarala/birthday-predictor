@@ -46,6 +46,7 @@ logs/
 # Uploads (WhatsApp files contain personal data)
 uploads/
 *.txt
+!requirements.txt
 
 # OS files
 .DS_Store
