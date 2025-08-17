@@ -283,8 +283,8 @@ def process_files_background(session_id, uploaded_files):
             }
             birthday_summaries.append(summary)
         
-        # Sort by date (most recent first)
-        birthday_summaries.sort(key=lambda x: (x['year'], x['birthday_month'], x['birthday_day']), reverse=True)
+        # Sort by confidence (highest confidence first)
+        birthday_summaries.sort(key=lambda x: x['confidence_percent'], reverse=True)
         
         # Store results temporarily (in a simple in-memory cache)
         global processing_results
@@ -327,6 +327,9 @@ def progress_stream(session_id):
         # Set up SSE headers
         yield "data: " + json.dumps({"status": "connected", "message": "Connection established"}) + "\n\n"
         
+        # Track last sent detail index to only send new updates
+        last_detail_index = 0
+        
         # Stream progress updates
         while True:
             progress = progress_tracker.get_progress(session_id)
@@ -334,15 +337,34 @@ def progress_stream(session_id):
                 yield f"data: {json.dumps({'error': 'Session not found'})}\n\n"
                 break
             
-            # Send progress update
-            yield f"data: {json.dumps(progress, default=str)}\n\n"
+            # Send basic progress data
+            progress_data = {
+                'progress': progress.get('percent', 0),
+                'current_task': progress.get('current_task', ''),
+                'status': progress.get('status', 'running'),
+                'step': progress.get('current_step', 0),
+                'total_steps': progress.get('total_steps', 1)
+            }
+            
+            # Send new activity details
+            details = progress.get('details', [])
+            if len(details) > last_detail_index:
+                new_details = details[last_detail_index:]
+                for detail in new_details:
+                    activity_data = progress_data.copy()
+                    activity_data['activity'] = detail.get('task', '') + (f" - {detail.get('details', '')}" if detail.get('details') else "")
+                    activity_data['activity_type'] = 'update'
+                    yield f"data: {json.dumps(activity_data, default=str)}\n\n"
+                last_detail_index = len(details)
+            
+            # Send current progress without activity
+            yield f"data: {json.dumps(progress_data, default=str)}\n\n"
             
             # Stop streaming if completed or errored
             if progress['status'] in ['completed', 'error']:
                 break
             
             # Wait before next update
-            import time
             time.sleep(0.5)  # Update every 500ms
     
     return Response(generate(), mimetype='text/event-stream', headers={
