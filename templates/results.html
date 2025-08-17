@@ -118,7 +118,7 @@
                             <td colspan="6">
                                 <div class="card card-body bg-light">
                                     <div class="row">
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <h6>Birthday Information:</h6>
                                             <ul class="small mb-2">
                                                 <li><strong>Date:</strong> {{ identity.birthday_date or 'Unknown' }}</li>
@@ -129,7 +129,7 @@
                                                 <li><strong>Wishers:</strong> {{ identity.wisher_count or identity.total_wishers or 0 }}</li>
                                             </ul>
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <h6>Birthday Messages:</h6>
                                             {% if identity.messages %}
                                                 <div class="message-list" style="max-height: 200px; overflow-y: auto;">
@@ -146,6 +146,21 @@
                                                 </div>
                                             {% else %}
                                                 <p class="text-muted small">No messages available</p>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6><i class="fas fa-robot me-1"></i>AI Analysis:</h6>
+                                            {% if identity.llm_analysis %}
+                                                <div class="bg-white p-3 rounded border" style="max-height: 200px; overflow-y: auto;">
+                                                    <p class="small mb-0">{{ identity.llm_analysis }}</p>
+                                                </div>
+                                            {% else %}
+                                                <p class="text-muted small">No AI analysis available</p>
+                                            {% endif %}
+                                            {% if identity.llm_source %}
+                                                <small class="text-muted d-block mt-2">
+                                                    <i class="fas fa-info-circle"></i> Source: {{ identity.llm_source|title }}
+                                                </small>
                                             {% endif %}
                                         </div>
                                     </div>
