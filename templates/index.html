@@ -5,22 +5,11 @@
     <div class="col-lg-9 col-xl-8">
         <!-- Hero Section -->
         <div class="text-center mb-5">
-            <div class="mb-3">
-                <span class="engine-badge">
-                    {% if llm_status.available %}
-                        <span class="pulse-dot"></span>
-                        <span>{{ llm_status.deployment }}</span>
-                    {% else %}
-                        <span class="pulse-dot warning"></span>
-                        <span>Heuristic Engine (No API Key)</span>
-                    {% endif %}
-                </span>
-            </div>
             <h1 class="display-5 fw-bold mb-3" style="letter-spacing: -0.03em;">
-                Discover every birthday hidden in your chats.
+                Never miss a friend's birthday again.
             </h1>
             <p class="text-muted fs-6 mx-auto mb-0" style="max-width: 580px; line-height: 1.6;">
-                Drop in your exported WhatsApp chat. The AI identifies who was celebrated, links phone numbers to names, adjusts for belated wishes, and exports an instant calendar.
+                Drop in your WhatsApp chat export to automatically organize celebrations, link phone numbers to contacts, adjust for belated wishes, and build your yearly calendar in seconds.
             </p>
         </div>
 
@@ -58,6 +47,10 @@
                         <i class="fas fa-sparkles me-2"></i>
                         Analyze Birthdays
                     </button>
+                    <div class="text-center mt-3 text-muted small" style="font-size: 0.82rem;">
+                        <i class="fas fa-shield-halved text-success me-1"></i>
+                        Processed locally with smart AI &bull; Your private chats never leave this machine
+                    </div>
                 </div>
             </form>
         </div>

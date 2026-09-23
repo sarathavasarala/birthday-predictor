@@ -166,20 +166,20 @@
                             <td colspan="6" class="p-0 border-0">
                                 <div class="drawer-content mb-3">
                                     <div class="row g-4">
-                                        <!-- AI Analysis & Reasoning -->
+                                        <!-- Detection Summary -->
                                         <div class="col-lg-5">
                                             <div class="d-flex align-items-center gap-2 mb-2">
-                                                <i class="fas fa-microchip text-primary"></i>
-                                                <span class="fw-bold small text-uppercase" style="letter-spacing: 0.05em;">AI Decision Summary</span>
+                                                <i class="fas fa-clipboard-check text-primary"></i>
+                                                <span class="fw-bold small text-uppercase" style="letter-spacing: 0.05em;">Detection Summary</span>
                                             </div>
                                             
                                             <div class="p-3 bg-white rounded-3 border mb-3">
                                                 <p class="small text-secondary mb-2" style="line-height: 1.6;">
-                                                    {{ identity.llm_analysis or 'Analyzed based on cluster messages, thanks responses, and mention patterns.' }}
+                                                    {{ identity.llm_analysis or 'Identified based on message timing, recipient responses, and mention patterns.' }}
                                                 </p>
                                                 <div class="d-flex justify-content-between align-items-center text-subtle small border-top pt-2 mt-2">
-                                                    <span>Engine: <strong>{{ identity.llm_source|title if identity.llm_source else 'TypeSafe Jev' }}</strong></span>
-                                                    <span>Certainty: <strong>{{ (identity.confidence * 100)|round|int }}%</strong></span>
+                                                    <span>Confidence: <strong>{{ (identity.confidence * 100)|round|int }}%</strong></span>
+                                                    <span>Wishers: <strong>{{ identity.wisher_count or identity.total_wishers or 0 }} people</strong></span>
                                                 </div>
                                             </div>
 

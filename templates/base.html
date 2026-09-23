@@ -30,10 +30,12 @@
                     <i class="fas fa-cloud-arrow-up"></i>
                     <span>Upload</span>
                 </a>
+                {% if has_predictions %}
                 <a class="nav-pill-btn {% if request.endpoint == 'results' %}active{% endif %}" href="{{ url_for('results') }}">
                     <i class="fas fa-calendar-check"></i>
                     <span>Predictions</span>
                 </a>
+                {% endif %}
             </nav>
         </div>
     </header>
@@ -63,10 +65,10 @@
         <div class="container">
             <p class="small mb-1 text-secondary">
                 <i class="fas fa-shield-halved text-success me-1"></i>
-                Private & Local: Chat files are processed entirely on your machine.
+                100% Private &amp; Local: Chat files are analyzed securely on your machine.
             </p>
             <p class="text-subtle small mb-0" style="color: var(--text-subtle);">
-                WhatsApp Birthday Predictor &bull; Powered by TypeSafe AI Jev
+                WhatsApp Birthday Predictor
             </p>
         </div>
     </footer>

@@ -294,9 +294,9 @@ class JevParser:
         }.get(timing_val, "wishes")
 
         analysis = (
-            f"Jev System One classified target as '{target_val or 'Unknown'}'{target_prob_str} "
-            f"based on {len(messages)} messages with {cluster.unique_wishers} unique wishers. "
-            f"Detected as {timing_str} with {final_confidence}% calibrated certainty."
+            f"Identified '{target_val or 'Unknown'}' based on {len(messages)} messages "
+            f"from {cluster.unique_wishers} unique wishers. Categorized as {timing_str} "
+            f"with {final_confidence}% confidence."
         )
 
         return {

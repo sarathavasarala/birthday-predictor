@@ -58,6 +58,18 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+@app.context_processor
+def inject_nav_state():
+    """Inject whether predictions exist into template context."""
+    session_id = session.get('progress_session_id')
+    has_results = False
+    if session_id and 'processing_results' in globals() and session_id in processing_results:
+        has_results = bool(processing_results[session_id].get('birthday_results'))
+    elif 'birthday_results' in session:
+        has_results = bool(session.get('birthday_results'))
+    return dict(has_predictions=has_results)
+
+
 @app.route('/')
 def index():
     """Main upload page."""
