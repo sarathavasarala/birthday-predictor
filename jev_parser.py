@@ -156,21 +156,37 @@ class JevParser:
             "unique_wishers": cluster.unique_wishers
         }
 
+        # Build criteria mappings required by TypeSafe API
+        target_criteria = {c: f"Candidate: {c}" for c in candidates}
+        timing_criteria = {
+            "on_time": "Sent on or for the actual birthday",
+            "belated": "Sent late (belated wish)",
+            "advance": "Sent early (advance wish)"
+        }
+        confidence_criteria = [
+            "Uncertain / no evidence",
+            "Low confidence",
+            "Medium confidence",
+            "High confidence",
+            "Certain with clear wishes or replies"
+        ]
+
         # Jev question primitives
         questions = {
             "target": {
                 "type": "choice",
                 "instructions": "Whose birthday is being celebrated in these messages? Pick their name or phone number from the options.",
-                "options": candidates
+                "criteria": target_criteria
             },
             "timing": {
                 "type": "choice",
                 "instructions": "Is this birthday wish sent on the actual birthday date, belated (late), or in advance (early)?",
-                "options": ["on_time", "belated", "advance"]
+                "criteria": timing_criteria
             },
             "confidence_score": {
                 "type": "score",
-                "instructions": "Rate how certain it is that this person's birthday is on or around this date based on the evidence (1=very dubious, 5=certain)."
+                "instructions": "Rate how certain it is that this person's birthday is on or around this date based on the evidence (1=very dubious, 5=certain).",
+                "criteria": confidence_criteria
             }
         }
 
@@ -216,17 +232,19 @@ class JevParser:
 
         # 1. Target recipient & probabilities
         target_answer = answers.get("target", {})
-        target_val = target_answer.get("value")
+        target_val = target_answer.get("choice") or target_answer.get("value")
         target_confidence = target_answer.get("confidence", 0.8)
         probabilities = target_answer.get("probabilities", {})
 
         # 2. Timing (on_time, belated, advance)
         timing_answer = answers.get("timing", {})
-        timing_val = timing_answer.get("value", "on_time")
+        timing_val = timing_answer.get("choice") or timing_answer.get("value") or "on_time"
 
         # 3. Confidence score (1-5 scale)
         conf_answer = answers.get("confidence_score", {})
-        raw_score = conf_answer.get("value", 4.0)
+        raw_score = conf_answer.get("score")
+        if raw_score is None:
+            raw_score = conf_answer.get("value", 4.0)
 
         # Normalize confidence to 0-100 percentage
         # Combine target_confidence (probability) and rubric score
