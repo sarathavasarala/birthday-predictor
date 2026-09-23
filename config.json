@@ -92,7 +92,7 @@
     }
   },
   "confidence": {
-    "min_threshold": 0.3,
+    "min_threshold": 0.6,
     "base_score": 0.3,
     "multi_year_bonus": 0.2,
     "unique_wishers_bonus": 0.2,
@@ -102,9 +102,10 @@
     "modifier_penalty": -0.1
   },
   "clustering": {
-    "window_hours": 36,
-    "min_wishers": 1,
-    "min_wish_score": 0.1
+    "window_hours": 16,
+    "min_wishers": 2,
+    "min_wish_score": 0.8,
+    "max_clusters_per_day": 2
   },
   "llm": {
     "deployment_name": "gpt-4.1",
@@ -115,6 +116,13 @@
     "rate_limit_delay": 2.0,
     "max_retries": 3,
     "retry_delay": 5.0
+  },
+  "jev": {
+    "enabled": true,
+    "model": "jev-latest",
+    "api_url": "https://api.typesafe.ai/v1/systemone",
+    "timeout": 10,
+    "max_messages": 12
   },
   "logging": {
     "level": "INFO",

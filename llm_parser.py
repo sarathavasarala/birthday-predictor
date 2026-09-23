@@ -10,13 +10,17 @@ import time
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from dotenv import load_dotenv
-from openai import AzureOpenAI
+try:
+    from openai import AzureOpenAI
+except ImportError:
+    AzureOpenAI = None
 
 # Load environment variables from .env file
 load_dotenv()
 
 from logging_config import get_logger
-from models import Message, WishCluster
+from models import Message, WishCluster, Participant
+from jev_parser import jev_parser
 
 logger = get_logger('llm_parser')
 
@@ -70,6 +74,10 @@ class LLMParser:
             deployment = os.getenv('AZURE_OPENAI_DEPLOYMENT', 'gpt-4.1')
             api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2025-01-01-preview')
             
+            if AzureOpenAI is None:
+                logger.info("openai package not installed in environment. Azure OpenAI fallback disabled.")
+                return
+
             if not api_key or not endpoint:
                 logger.warning("Azure OpenAI credentials not found in environment variables. "
                              "LLM parsing will be disabled. Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT.")
@@ -92,28 +100,43 @@ class LLMParser:
             self.client = None
     
     def is_available(self) -> bool:
-        """Check if LLM parsing is available."""
-        return self.client is not None
-    
-    def analyze_birthday_cluster(self, cluster: WishCluster, messages: List[Message]) -> Dict[str, Any]:
+        """Check if any AI parser (Jev or Azure OpenAI) is available."""
+        return jev_parser.is_available() or self.client is not None
+
+    def get_active_engine(self) -> Optional[str]:
+        """Get the name of the active AI engine."""
+        if jev_parser.is_available():
+            return f"TypeSafe Jev ({jev_parser.model})"
+        elif self.client is not None:
+            return f"Azure OpenAI ({self.deployment_name})"
+        return None
+
+    def analyze_birthday_cluster(self, cluster: WishCluster, messages: List[Message],
+                                 participants: Optional[List[Participant]] = None) -> Dict[str, Any]:
         """
-        Analyze a birthday cluster using LLM to extract structured information.
+        Analyze a birthday cluster using the best available AI engine (Jev or Azure OpenAI).
         
         Args:
             cluster: The birthday cluster to analyze
             messages: List of messages in the cluster
+            participants: Optional list of participants from the chat
             
         Returns:
-            Dictionary with extracted information including:
-            - date: Birthday date (MM-DD format)
-            - person: Name of birthday person
-            - phone_number: Phone number if found
-            - confidence: Confidence score (0-100)
-            - year: Birth year if mentioned
-            - analysis: LLM's reasoning
+            Dictionary with extracted information.
         """
-        if not self.is_available():
-            logger.warning("LLM parser not available, returning fallback analysis")
+        # Try Jev (TypeSafe System One) first if available
+        if jev_parser.is_available():
+            try:
+                result = jev_parser.analyze_birthday_cluster(cluster, messages, participants)
+                logger.info(f"Jev analysis completed for cluster {cluster.date}: "
+                           f"person={result.get('person')}, confidence={result.get('confidence')}%")
+                return result
+            except Exception as e:
+                logger.warning(f"Jev analysis failed for cluster {cluster.date}: {e}. Falling back to Azure OpenAI.")
+
+        # Fallback to Azure OpenAI if available
+        if self.client is None:
+            logger.warning("Neither Jev nor Azure OpenAI available, returning fallback analysis")
             return self._fallback_analysis(cluster, messages)
         
         try:

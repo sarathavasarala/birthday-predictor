@@ -11,6 +11,14 @@
                 Birthday Predictions
             </h2>
             <div>
+                <button id="selectAllBtn" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-check-square me-1"></i>
+                    Select All
+                </button>
+                <button id="exportIcsBtn" class="btn btn-success me-2" disabled>
+                    <i class="fas fa-calendar-plus me-1"></i>
+                    Export Calendar (.ics)
+                </button>
                 <a href="{{ url_for('export_csv') }}" class="btn btn-outline-success me-2">
                     <i class="fas fa-download me-1"></i>
                     Export CSV
@@ -56,6 +64,9 @@
                 <table class="table table-hover">
                     <thead class="table-dark">
                         <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="selectAll" class="form-check-input">
+                            </th>
                             <th>Name</th>
                             <th>Birthday</th>
                             <th>Wishers</th>
@@ -67,6 +78,14 @@
                     <tbody>
                         {% for identity in identities %}
                         <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input birthday-checkbox" 
+                                       data-name="{{ identity.canonical_name or 'Unknown' }}"
+                                       data-month="{{ identity.birthday_month }}"
+                                       data-day="{{ identity.birthday_day }}"
+                                       data-confidence="{{ identity.confidence }}"
+                                       {% if identity.confidence >= 0.6 %}checked{% endif %}>
+                            </td>
                             <td>
                                 <strong>{{ identity.canonical_name or 'Unknown' }}</strong>
                                 {% if identity.confidence >= 0.5 %}
@@ -115,7 +134,7 @@
                         </tr>
                         <!-- Collapsible Row for Details -->
                         <tr class="collapse" id="details-{{ loop.index }}">
-                            <td colspan="6">
+                            <td colspan="7">
                                 <div class="card card-body bg-light">
                                     <div class="row">
                                         <div class="col-md-4">
@@ -185,4 +204,99 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const exportIcsBtn = document.getElementById('exportIcsBtn');
+    const birthdayCheckboxes = document.querySelectorAll('.birthday-checkbox');
+    
+    // Select All functionality
+    selectAllCheckbox.addEventListener('change', function() {
+        birthdayCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+        updateExportButton();
+    });
+    
+    // Select All button functionality
+    selectAllBtn.addEventListener('click', function() {
+        const allChecked = Array.from(birthdayCheckboxes).every(cb => cb.checked);
+        birthdayCheckboxes.forEach(checkbox => {
+            checkbox.checked = !allChecked;
+        });
+        selectAllCheckbox.checked = !allChecked;
+        updateExportButton();
+        
+        // Update button text
+        this.innerHTML = allChecked ? 
+            '<i class="fas fa-check-square me-1"></i>Select All' : 
+            '<i class="fas fa-square me-1"></i>Deselect All';
+    });
+    
+    // Update export button when individual checkboxes change
+    birthdayCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateExportButton);
+    });
+    
+    function updateExportButton() {
+        const checkedBoxes = document.querySelectorAll('.birthday-checkbox:checked');
+        exportIcsBtn.disabled = checkedBoxes.length === 0;
+        exportIcsBtn.innerHTML = checkedBoxes.length > 0 ? 
+            `<i class="fas fa-calendar-plus me-1"></i>Export Calendar (${checkedBoxes.length})` :
+            '<i class="fas fa-calendar-plus me-1"></i>Export Calendar (.ics)';
+    }
+    
+    // Export ICS functionality
+    exportIcsBtn.addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.birthday-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Please select at least one birthday to export.');
+            return;
+        }
+        
+        const birthdays = Array.from(checkedBoxes).map(checkbox => ({
+            name: checkbox.dataset.name,
+            month: parseInt(checkbox.dataset.month),
+            day: parseInt(checkbox.dataset.day),
+            confidence: parseFloat(checkbox.dataset.confidence)
+        }));
+        
+        // Send to backend for ICS generation
+        fetch('/export_ics', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ birthdays: birthdays })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Export failed');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            // Download the ICS file
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'birthdays.ics';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to export calendar. Please try again.');
+        });
+    });
+    
+    // Initial state
+    updateExportButton();
+});
+</script>
 {% endblock %}

@@ -34,10 +34,11 @@ venv.bak/
 instance/
 .webassets-cache
 
-# Database
+# Database & Export files
 *.db
 *.sqlite3
 database.sqlite
+*.ics
 
 # Logs
 logs/

@@ -135,23 +135,36 @@ class BirthdayAnalyzer:
         if self.negative_pattern.search(text_lower):
             return 0.0
         
-        # Strong wish patterns
+        # Require minimum message length for context
+        words = text.split()
+        if len(words) < 3:
+            return 0.0  # Too short to be meaningful
+        
+        # Strong wish patterns - REQUIRED for any score
         strong_matches = len(self.strong_wish_pattern.findall(text_lower))
-        score += strong_matches * 0.8
+        if strong_matches == 0:
+            return 0.0  # Must have at least one strong pattern
         
-        # Weak signals (emojis)
+        # Base score for strong patterns
+        score = 0.8 * strong_matches
+        
+        # Weak signals (emojis) - only as supplement to strong patterns
         weak_signals = self.patterns.get('weak_signals', [])
-        for emoji in weak_signals:
-            if emoji in text:
-                score += 0.1
+        emoji_count = sum(1 for emoji in weak_signals if emoji in text)
+        if emoji_count > 0:
+            score += min(0.2, emoji_count * 0.1)  # Cap emoji bonus at 0.2
         
-        # Bonus for multiple indicators
-        if strong_matches > 1:
+        # Bonus for explicit name mentions
+        if self.name_mention_pattern.search(text):
             score += 0.2
         
-        # Penalty for very short messages without strong indicators
-        if len(text.split()) < 3 and strong_matches == 0:
-            score *= 0.5
+        # Bonus for multiple strong indicators
+        if strong_matches > 1:
+            score += 0.1
+        
+        # Bonus for longer, more contextual messages
+        if len(words) > 6:
+            score += 0.1
         
         return min(score, 1.0)  # Cap at 1.0
     
@@ -251,13 +264,20 @@ class BirthdayAnalyzer:
             clusters = []
             window_hours = self.clustering_config.get('window_hours', 36)
             min_wish_score = self.clustering_config.get('min_wish_score', 0.3)
+            min_wishers = self.clustering_config.get('min_wishers', 1)
+            max_clusters_per_day = self.clustering_config.get('max_clusters_per_day', 3)
             
             # Sort dates for processing
             sorted_dates = sorted(date_groups.keys())
             processed_dates = set()
+            daily_cluster_counts = defaultdict(int)
             
             for current_date in sorted_dates:
                 if current_date in processed_dates:
+                    continue
+                
+                # Check daily limit
+                if daily_cluster_counts[current_date] >= max_clusters_per_day:
                     continue
                 
                 # Find all wishes within the window
@@ -273,9 +293,15 @@ class BirthdayAnalyzer:
                         cluster_wishes.extend(date_groups[check_date])
                         cluster_dates.add(check_date)
                 
-                # Only create cluster if it meets minimum criteria
+                # Count unique wishers for this cluster
+                unique_wishers = self._count_unique_wishers(cluster_wishes, message_lookup)
                 total_score = sum(w.wish_score for w in cluster_wishes)
-                if total_score >= min_wish_score:
+                
+                # Only create cluster if it meets ALL minimum criteria
+                if (total_score >= min_wish_score and 
+                    unique_wishers >= min_wishers and
+                    len(cluster_wishes) >= min_wishers):
+                    
                     # Find the peak date (date with highest wish density)
                     peak_date = self._find_peak_date(cluster_wishes, message_lookup, cluster_dates)
                     
@@ -283,7 +309,7 @@ class BirthdayAnalyzer:
                         chat_id=chat_id,
                         date=peak_date,
                         wish_messages=cluster_wishes,
-                        unique_wishers=self._count_unique_wishers(cluster_wishes, message_lookup),
+                        unique_wishers=unique_wishers,
                         total_wish_score=total_score,
                         has_thanks=any(w.is_thanks for w in cluster_wishes),
                         has_explicit_mentions=any(w.mentioned_names for w in cluster_wishes)
@@ -292,9 +318,15 @@ class BirthdayAnalyzer:
                     clusters.append(cluster)
                     processed_dates.update(cluster_dates)
                     
-                    self.logger.debug(f"Created cluster for {peak_date} with {len(cluster_wishes)} wishes")
+                    # Update daily counts for all affected dates
+                    for date in cluster_dates:
+                        daily_cluster_counts[date] += 1
+                    
+                    self.logger.debug(f"Created cluster for {peak_date} with {len(cluster_wishes)} wishes, {unique_wishers} wishers")
+                else:
+                    self.logger.debug(f"Rejected cluster for {current_date}: score={total_score:.2f}, wishers={unique_wishers}, min_score={min_wish_score}, min_wishers={min_wishers}")
             
-            self.logger.info(f"Created {len(clusters)} wish clusters")
+            self.logger.info(f"Created {len(clusters)} wish clusters (enforced limits: max_per_day={max_clusters_per_day}, min_wishers={min_wishers})")
             return clusters
     
     def _find_peak_date(self, wishes: List[WishMessage], message_lookup: Dict[int, Message], 
@@ -503,3 +535,138 @@ class BirthdayAnalyzer:
             self.logger.debug(f"Adjusted date forwards for advance wishes: {adjusted_date}")
         
         return adjusted_date
+    
+    @log_function_call
+    def calculate_confidence(self, cluster: WishCluster, target_participant: Optional[Participant] = None) -> float:
+        """
+        Calculate confidence score for a birthday prediction cluster.
+        
+        Args:
+            cluster: WishCluster object
+            target_participant: Optional participant info for additional context
+            
+        Returns:
+            Confidence score between 0 and 1
+        """
+        # Start with base score
+        confidence = self.config.get('confidence', {}).get('base_score', 0.3)
+        
+        # Unique wishers bonus
+        unique_wishers_bonus = self.config.get('confidence', {}).get('unique_wishers_bonus', 0.2)
+        if cluster.unique_wishers >= 5:
+            confidence += unique_wishers_bonus
+            self.logger.debug(f"High wishers bonus: +{unique_wishers_bonus:.3f} ({cluster.unique_wishers} wishers)")
+        elif cluster.unique_wishers >= 3:
+            confidence += unique_wishers_bonus * 0.5
+            self.logger.debug(f"Medium wishers bonus: +{unique_wishers_bonus * 0.5:.3f}")
+        
+        # Explicit mention bonus
+        if cluster.has_explicit_mentions:
+            explicit_bonus = self.config.get('confidence', {}).get('explicit_mention_bonus', 0.1)
+            confidence += explicit_bonus
+            self.logger.debug(f"Explicit mention bonus: +{explicit_bonus:.3f}")
+        
+        # Thanks message bonus
+        if cluster.has_thanks:
+            thanks_bonus = self.config.get('confidence', {}).get('thanks_bonus', 0.15)
+            confidence += thanks_bonus
+            self.logger.debug(f"Thanks message bonus: +{thanks_bonus:.3f}")
+        
+        # Phone number confidence
+        if target_participant and target_participant.phone:
+            phone_bonus = 0.1
+            confidence += phone_bonus
+            self.logger.debug(f"Phone number bonus: +{phone_bonus:.3f}")
+        
+        # High wish score bonus
+        if cluster.total_wish_score >= 3.0:
+            high_score_bonus = 0.15
+            confidence += high_score_bonus
+            self.logger.debug(f"High wish score bonus: +{high_score_bonus:.3f}")
+        
+        # Ensure confidence is within bounds
+        confidence = max(0.0, min(1.0, confidence))
+        
+        self.logger.debug(f"Final confidence for cluster {cluster.date}: {confidence:.3f}")
+        return confidence
+    
+    @log_function_call
+    def simple_identity_resolution(self, clusters: List[WishCluster], 
+                                 all_participants: List[Participant]) -> List[Dict[str, Any]]:
+        """
+        Simplified identity resolution - just group by name and phone.
+        
+        Args:
+            clusters: All wish clusters with inferred targets
+            all_participants: All participants from all chats
+            
+        Returns:
+            List of simplified identity dictionaries
+        """
+        # Create participant lookup
+        participant_lookup = {p.id: p for p in all_participants if p.id}
+        
+        # Group by identity
+        identities = defaultdict(list)
+        
+        for cluster in clusters:
+            if not cluster.target_participant_id or not cluster.date:
+                continue
+            
+            participant = participant_lookup.get(cluster.target_participant_id)
+            if not participant:
+                continue
+            
+            # Simple identity key: phone first, then name
+            identity_key = participant.phone or participant.display_name or f"unknown_{participant.id}"
+            
+            identities[identity_key].append({
+                'cluster': cluster,
+                'participant': participant,
+                'date': cluster.date
+            })
+        
+        # Convert to final format
+        resolved_identities = []
+        min_threshold = self.config.get('confidence', {}).get('min_threshold', 0.6)
+        
+        for identity_key, observations in identities.items():
+            if not observations:
+                continue
+            
+            # Get best observation
+            best_obs = max(observations, key=lambda x: x['cluster'].unique_wishers)
+            participant = best_obs['participant']
+            
+            # Calculate simple confidence
+            total_wishers = sum(obs['cluster'].unique_wishers for obs in observations)
+            years_observed = len(set(obs['date'].year for obs in observations))
+            
+            confidence = self.calculate_confidence(best_obs['cluster'], participant)
+            
+            # Add multi-year bonus
+            if years_observed > 1:
+                confidence += 0.2 * min(years_observed - 1, 2) / 2  # Cap at 2 extra years
+            
+            confidence = min(1.0, confidence)
+            
+            # Only include if above threshold
+            if confidence >= min_threshold:
+                identity = {
+                    'name': participant.display_name or identity_key,
+                    'phone': participant.phone,
+                    'birthday_month': best_obs['date'].month,
+                    'birthday_day': best_obs['date'].day,
+                    'confidence': confidence,
+                    'years_observed': years_observed,
+                    'total_wishers': total_wishers,
+                    'best_cluster_date': best_obs['date'].isoformat(),
+                    'observations_count': len(observations)
+                }
+                resolved_identities.append(identity)
+        
+        # Sort by confidence
+        resolved_identities.sort(key=lambda x: x['confidence'], reverse=True)
+        
+        self.logger.info(f"Resolved {len(resolved_identities)} identities above threshold")
+        return resolved_identities
