@@ -2,196 +2,124 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="text-center mb-4">
-            <h1 class="display-4">
-                <i class="fas fa-birthday-cake text-primary"></i>
-                Birthday Detector
+    <div class="col-lg-9 col-xl-8">
+        <!-- Hero Section -->
+        <div class="text-center mb-5">
+            <div class="mb-3">
+                <span class="engine-badge">
+                    {% if llm_status.available %}
+                        <span class="pulse-dot"></span>
+                        <span>{{ llm_status.deployment }}</span>
+                    {% else %}
+                        <span class="pulse-dot warning"></span>
+                        <span>Heuristic Engine (No API Key)</span>
+                    {% endif %}
+                </span>
+            </div>
+            <h1 class="display-5 fw-bold mb-3" style="letter-spacing: -0.03em;">
+                Discover every birthday hidden in your chats.
             </h1>
-            <p class="lead text-muted">
-                Upload your WhatsApp chat exports to discover birthdays mentioned in your conversations
+            <p class="text-muted fs-6 mx-auto mb-0" style="max-width: 580px; line-height: 1.6;">
+                Drop in your exported WhatsApp chat. The AI identifies who was celebrated, links phone numbers to names, adjusts for belated wishes, and exports an instant calendar.
             </p>
         </div>
 
-        <!-- Upload Form -->
-        <div class="card shadow">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="fas fa-upload me-2"></i>
-                    Upload WhatsApp Chat Exports
-                </h5>
-                
-                <form id="uploadForm" action="{{ url_for('upload_files') }}" method="post" enctype="multipart/form-data">
-                    <div class="upload-area" id="uploadArea">
-                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                        <h5>Drag & drop your WhatsApp chat files here</h5>
-                        <p class="text-muted">or click to select files</p>
-                        <input type="file" id="fileInput" name="files" multiple accept=".txt" style="display: none;">
-                        <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('fileInput').click()">
-                            Select Files
-                        </button>
+        <!-- Upload Card -->
+        <div class="surface-card p-4 p-md-5 mb-5">
+            <form id="uploadForm" action="{{ url_for('upload_files') }}" method="post" enctype="multipart/form-data">
+                <div class="dropzone-container" id="uploadArea">
+                    <div class="dropzone-icon-circle">
+                        <i class="fas fa-arrow-up-from-bracket"></i>
                     </div>
+                    <div class="dropzone-title">Upload your WhatsApp export</div>
+                    <p class="dropzone-desc">Drag & drop your chat <code>.txt</code> file here, or click to browse</p>
                     
-                    <div id="fileList" class="mt-3" style="display: none;">
-                        <h6>Selected Files:</h6>
-                        <ul id="selectedFiles" class="list-group"></ul>
-                    </div>
-                    
-                    <div class="d-grid gap-2 mt-3">
-                        <button type="submit" class="btn btn-primary btn-lg" id="uploadBtn" disabled>
-                            <i class="fas fa-magic me-2"></i>
-                            Analyze Files
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Progress Modal -->
-        <div class="modal fade" id="progressModal" tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="progressModalLabel">
-                            <i class="fas fa-cogs me-2"></i>
-                            Processing Your Files
-                        </h5>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <div class="progress" style="height: 25px;">
-                                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
-                                     role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-                                    0%
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6><i class="fas fa-tasks me-2"></i>Current Task:</h6>
-                                <p id="currentTask" class="text-muted">Initializing...</p>
-                            </div>
-                            <div class="col-md-6">
-                                <h6><i class="fas fa-clock me-2"></i>Status:</h6>
-                                <p id="progressStatus" class="text-muted">Starting...</p>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-4">
-                            <h6><i class="fas fa-list me-2"></i>Recent Activity:</h6>
-                            <div id="activityLog" class="border rounded p-3" style="height: 200px; overflow-y: auto; background-color: #f8f9fa;">
-                                <div class="text-muted">Waiting for updates...</div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-3 text-center">
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Please don't close this window. Processing may take a few minutes depending on file size.
-                            </small>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" id="cancelBtn" disabled>
-                            <i class="fas fa-times me-2"></i>
-                            Cancel
-                        </button>
-                        <button type="button" class="btn btn-success" id="viewResultsBtn" style="display: none;" onclick="window.location.href='/results'">
-                            <i class="fas fa-eye me-2"></i>
-                            View Results
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- LLM Status -->
-        <div class="card mt-4">
-            <div class="card-body">
-                <h6 class="card-title">
-                    <i class="fas fa-robot me-2"></i>
-                    AI Analysis Status
-                </h6>
-                {% if llm_status.available %}
-                <div class="alert alert-success mb-0">
-                    <i class="fas fa-check-circle me-2"></i>
-                    <strong>AI Analysis Enabled</strong> - Using {{ llm_status.deployment }} for enhanced birthday detection
-                    <br><small class="text-muted">The system will analyze messages intelligently to identify birthday persons with high accuracy.</small>
-                </div>
-                {% else %}
-                <div class="alert alert-warning mb-0">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>AI Analysis Disabled</strong> - Basic pattern matching will be used
-                    <br><small class="text-muted">For enhanced results, configure TypeSafe AI (TYPESAFE_API_KEY) or Azure OpenAI credentials in .env.</small>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Instructions -->
-        <div class="card mt-4">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="fas fa-info-circle me-2"></i>
-                    How to Export WhatsApp Chats
-                </h5>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6><i class="fab fa-apple me-2"></i>iPhone:</h6>
-                        <ol class="small">
-                            <li>Open WhatsApp and go to the chat</li>
-                            <li>Tap the contact/group name at the top</li>
-                            <li>Scroll down and tap "Export Chat"</li>
-                            <li>Choose "Without Media"</li>
-                            <li>Save the .txt file</li>
-                        </ol>
-                    </div>
-                    <div class="col-md-6">
-                        <h6><i class="fab fa-android me-2"></i>Android:</h6>
-                        <ol class="small">
-                            <li>Open WhatsApp and go to the chat</li>
-                            <li>Tap the three dots menu</li>
-                            <li>Select "More" → "Export chat"</li>
-                            <li>Choose "Without media"</li>
-                            <li>Save the .txt file</li>
-                        </ol>
-                    </div>
-                </div>
-                
-                <div class="alert alert-info mt-3">
-                    <i class="fas fa-lightbulb me-2"></i>
-                    <strong>Tips:</strong>
-                    <ul class="mb-0 mt-2">
-                        <li>Upload multiple chat exports for better results</li>
-                        <li>Include group chats where birthdays are celebrated</li>
-                        <li>Older chats with more history work better</li>
-                        <li>Only .txt files are supported (no media)</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <!-- Clear Data -->
-        {% if request.endpoint == 'results' or (request.args.get('has_data') == 'true') %}
-        <div class="card mt-4 border-warning">
-            <div class="card-body">
-                <h6 class="card-title text-warning">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Clear Previous Data
-                </h6>
-                <p class="card-text small">
-                    Remove all previously processed data from the database.
-                </p>
-                <form action="{{ url_for('clear_data') }}" method="post" style="display: inline;">
-                    <button type="submit" class="btn btn-sm btn-outline-warning" 
-                            onclick="return confirm('Are you sure you want to clear all data?')">
-                        <i class="fas fa-trash me-1"></i>
-                        Clear All Data
+                    <input type="file" id="fileInput" name="files" multiple accept=".txt" style="display: none;">
+                    <button type="button" class="btn btn-modern-secondary" id="browseBtn">
+                        <i class="fas fa-folder-open me-1"></i>
+                        Browse Files
                     </button>
-                </form>
+                </div>
+                
+                <!-- Selected Files Preview -->
+                <div id="fileList" class="mt-4" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-semibold text-muted small text-uppercase" style="letter-spacing: 0.05em;">Selected Files</span>
+                        <button type="button" class="btn btn-link text-muted text-decoration-none small p-0" id="clearFilesBtn">
+                            <i class="fas fa-xmark me-1"></i>Clear
+                        </button>
+                    </div>
+                    <div id="selectedFiles" class="d-flex flex-wrap gap-2"></div>
+                </div>
+                
+                <!-- Submit Action -->
+                <div class="mt-4 pt-2">
+                    <button type="submit" class="btn btn-modern-primary w-100 py-3" id="uploadBtn" disabled>
+                        <i class="fas fa-sparkles me-2"></i>
+                        Analyze Birthdays
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- How to Export Guide (Clean Accordion / Tabs) -->
+        <div class="surface-card p-4 p-md-5 mb-4">
+            <h5 class="fw-bold mb-4 d-flex align-items-center gap-2">
+                <i class="fas fa-circle-question text-primary"></i>
+                <span>How to export your chat from WhatsApp</span>
+            </h5>
+
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3" style="background: var(--bg-subtle);">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="fab fa-apple text-dark fs-5"></i>
+                            <span class="fw-bold">iPhone (iOS)</span>
+                        </div>
+                        <ol class="small text-muted ps-3 mb-0" style="line-height: 1.8;">
+                            <li>Open the chat or group in WhatsApp.</li>
+                            <li>Tap the contact/group name at the top.</li>
+                            <li>Scroll to the bottom and tap <strong>Export Chat</strong>.</li>
+                            <li>Choose <strong>"Without Media"</strong>.</li>
+                            <li>Save the <code>.txt</code> file to Files and upload it here.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3" style="background: var(--bg-subtle);">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="fab fa-android text-success fs-5"></i>
+                            <span class="fw-bold">Android</span>
+                        </div>
+                        <ol class="small text-muted ps-3 mb-0" style="line-height: 1.8;">
+                            <li>Open the chat or group in WhatsApp.</li>
+                            <li>Tap the three dots menu (<strong>⋮</strong>) in the top-right.</li>
+                            <li>Select <strong>More</strong> &rarr; <strong>Export chat</strong>.</li>
+                            <li>Choose <strong>"Without media"</strong>.</li>
+                            <li>Save or send the <code>.txt</code> file to upload here.</li>
+                        </ol>
+                    </div>
+                </div>
             </div>
+
+            <div class="d-flex align-items-center gap-2 mt-4 p-3 rounded-3" style="background: var(--primary-light); color: var(--primary);">
+                <i class="fas fa-lightbulb"></i>
+                <small class="fw-semibold">
+                    Tip: Larger group chats with multiple years of history yield the richest birthday directories!
+                </small>
+            </div>
+        </div>
+
+        <!-- Optional Clear Data -->
+        {% if request.endpoint == 'results' or (request.args.get('has_data') == 'true') %}
+        <div class="text-center mt-4">
+            <form action="{{ url_for('clear_data') }}" method="post" onsubmit="return confirm('Clear all cached predictions?');">
+                <button type="submit" class="btn btn-link text-muted text-decoration-none small">
+                    <i class="fas fa-trash-can me-1"></i>
+                    Reset database & clear previous data
+                </button>
+            </form>
         </div>
         {% endif %}
     </div>
@@ -203,82 +131,95 @@
 document.addEventListener('DOMContentLoaded', function() {
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
+    const browseBtn = document.getElementById('browseBtn');
+    const clearFilesBtn = document.getElementById('clearFilesBtn');
     const fileList = document.getElementById('fileList');
     const selectedFiles = document.getElementById('selectedFiles');
     const uploadBtn = document.getElementById('uploadBtn');
     const uploadForm = document.getElementById('uploadForm');
 
-    // Drag and drop functionality
-    uploadArea.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        uploadArea.classList.add('dragover');
+    // Drag and drop events
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
     });
 
-    uploadArea.addEventListener('dragleave', function(e) {
-        e.preventDefault();
-        uploadArea.classList.remove('dragover');
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
     });
 
-    uploadArea.addEventListener('drop', function(e) {
-        e.preventDefault();
-        uploadArea.classList.remove('dragover');
-        
+    uploadArea.addEventListener('drop', (e) => {
         const files = e.dataTransfer.files;
-        fileInput.files = files;
-        displaySelectedFiles(files);
+        if (files && files.length > 0) {
+            fileInput.files = files;
+            displayFiles(files);
+        }
     });
 
-    // Click to select files
-    uploadArea.addEventListener('click', function() {
+    uploadArea.addEventListener('click', (e) => {
+        if (e.target !== browseBtn) {
+            fileInput.click();
+        }
+    });
+
+    browseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         fileInput.click();
     });
 
-    // File input change
     fileInput.addEventListener('change', function() {
-        displaySelectedFiles(this.files);
+        displayFiles(this.files);
     });
 
-    function displaySelectedFiles(files) {
+    clearFilesBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        displayFiles([]);
+    });
+
+    function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function displayFiles(files) {
         selectedFiles.innerHTML = '';
         
-        if (files.length === 0) {
+        if (!files || files.length === 0) {
             fileList.style.display = 'none';
             uploadBtn.disabled = true;
             return;
         }
 
-        fileList.style.display = 'block';
-        uploadBtn.disabled = false;
-
+        let validCount = 0;
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            const li = document.createElement('li');
-            li.className = 'list-group-item d-flex justify-content-between align-items-center';
-            
             const isValid = file.name.toLowerCase().endsWith('.txt');
-            const icon = isValid ? 'fa-file-text text-success' : 'fa-exclamation-triangle text-danger';
-            const status = isValid ? 'Valid' : 'Invalid file type';
-            
-            li.innerHTML = `
-                <span>
-                    <i class="fas ${icon} me-2"></i>
-                    ${file.name}
-                </span>
-                <span class="badge ${isValid ? 'bg-success' : 'bg-danger'}">${status}</span>
+            if (isValid) validCount++;
+
+            const chip = document.createElement('div');
+            chip.className = 'file-chip';
+            chip.innerHTML = `
+                <i class="fas ${isValid ? 'fa-file-lines text-primary' : 'fa-triangle-exclamation text-danger'}"></i>
+                <span>${file.name}</span>
+                <span class="text-muted small">(${formatBytes(file.size)})</span>
             `;
-            
-            selectedFiles.appendChild(li);
+            selectedFiles.appendChild(chip);
         }
+
+        fileList.style.display = 'block';
+        uploadBtn.disabled = validCount === 0;
+        uploadBtn.innerHTML = `<i class="fas fa-sparkles me-2"></i>Analyze ${validCount} ${validCount === 1 ? 'Chat' : 'Chats'}`;
     }
 
-    // Form submission with progress modal
-    uploadForm.addEventListener('submit', function(e) {
-        // Update UI to show processing state
-        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+    uploadForm.addEventListener('submit', function() {
         uploadBtn.disabled = true;
-        
-        // Let the form submit normally - it will redirect to processing page
-        return true;
+        uploadBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Preparing analysis...';
     });
 });
 </script>

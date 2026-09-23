@@ -1,282 +1,168 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Processing Files - WhatsApp Birthday Detector</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .processing-container {
-            max-width: 800px;
-            margin: 50px auto;
-            padding: 40px;
-        }
-        .progress-section {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: 1px solid #e3e6f0;
-        }
-        .activity-log {
-            max-height: 300px;
-            overflow-y: auto;
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            border: 1px solid #dee2e6;
-        }
-        .activity-item {
-            padding: 8px 0;
-            border-bottom: 1px solid #e9ecef;
-            animation: slideIn 0.3s ease-out;
-        }
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        .spinner-pulse {
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
-        }
-        .status-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            font-size: 24px;
-        }
-        .status-processing {
-            background: linear-gradient(45deg, #4e73df, #36b9cc);
-            color: white;
-        }
-        .status-success {
-            background: linear-gradient(45deg, #1cc88a, #36b9cc);
-            color: white;
-        }
-        .status-error {
-            background: linear-gradient(45deg, #e74a3b, #f6c23e);
-            color: white;
-        }
-    </style>
-</head>
-<body style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh;">
-    <div class="container-fluid">
-        <div class="processing-container">
-            <div class="progress-section">
-                <!-- Status Icon -->
-                <div class="status-icon status-processing spinner-pulse" id="statusIcon">
-                    <i class="fas fa-cog fa-spin"></i>
-                </div>
+{% extends "base.html" %}
 
-                <!-- Main Status -->
-                <div class="text-center mb-4">
-                    <h3 class="mb-2" id="mainStatus">Processing Your WhatsApp Files</h3>
-                    <p class="text-muted mb-4" id="currentTask">Initializing analysis...</p>
-                </div>
+{% block title %}Analyzing Chats - WhatsApp Birthday Predictor{% endblock %}
 
-                <!-- Progress Bar -->
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Progress</span>
-                        <span class="text-muted" id="progressText">0%</span>
-                    </div>
-                    <div class="progress" style="height: 10px;">
-                        <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" 
-                             role="progressbar" 
-                             style="width: 0%" 
-                             id="progressBar"
-                             aria-valuenow="0" 
-                             aria-valuemin="0" 
-                             aria-valuemax="100">
-                        </div>
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <!-- Progress Container -->
+        <div class="surface-card p-4 p-md-5">
+            <!-- Header Icon & Status -->
+            <div class="text-center mb-4">
+                <div class="brand-icon mx-auto mb-3" style="width: 54px; height: 54px; font-size: 1.5rem;" id="statusIcon">
+                    <i class="fas fa-sparkles fa-spin"></i>
+                </div>
+                <h3 class="fw-bold mb-2" id="mainStatus" style="letter-spacing: -0.02em;">Analyzing WhatsApp Conversations</h3>
+                <p class="text-muted mb-0" id="currentTask">Initializing detection engine...</p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small fw-semibold text-muted text-uppercase" style="letter-spacing: 0.05em;">Analysis Progress</span>
+                    <span class="small fw-bold text-primary" id="progressText">0%</span>
+                </div>
+                <div class="progress" style="height: 10px; background-color: var(--bg-subtle); border-radius: var(--radius-pill); overflow: hidden;">
+                    <div class="progress-bar" id="progressBar" role="progressbar" 
+                         style="width: 0%; background: linear-gradient(90deg, #4f46e5, #7c3aed);">
                     </div>
                 </div>
+            </div>
 
-                <!-- Step Details -->
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="text-center p-3 bg-light rounded">
-                            <h6 class="mb-1">Current Step</h6>
-                            <span class="text-primary" id="stepInfo">Getting started...</span>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="text-center p-3 bg-light rounded">
-                            <h6 class="mb-1">Status</h6>
-                            <span class="badge bg-primary" id="statusBadge">Processing</span>
-                        </div>
+            <!-- Stage & Status Badges -->
+            <div class="row g-3 mb-4">
+                <div class="col-6">
+                    <div class="p-3 rounded-3" style="background: var(--bg-subtle); border: 1px solid var(--border-subtle);">
+                        <div class="small text-muted text-uppercase fw-semibold mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Current Step</div>
+                        <div class="fw-bold text-truncate" id="stepInfo" style="font-size: 0.95rem;">Getting started...</div>
                     </div>
                 </div>
-
-                <!-- Activity Log -->
-                <div class="mb-4">
-                    <h6 class="mb-3">
-                        <i class="fas fa-list-ul me-2"></i>Activity Log
-                    </h6>
-                    <div class="activity-log" id="activityLog">
-                        <div class="text-muted text-center">
-                            <i class="fas fa-clock me-2"></i>Waiting for updates...
-                        </div>
+                <div class="col-6">
+                    <div class="p-3 rounded-3" style="background: var(--bg-subtle); border: 1px solid var(--border-subtle);">
+                        <div class="small text-muted text-uppercase fw-semibold mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Engine State</div>
+                        <div class="fw-bold text-primary" id="statusBadge" style="font-size: 0.95rem;">Processing</div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Action Buttons -->
-                <div class="text-center">
-                    <button class="btn btn-success btn-lg d-none" id="viewResultsBtn" onclick="window.location.href='/results'">
-                        <i class="fas fa-eye me-2"></i>View Results
-                    </button>
-                    <button class="btn btn-outline-secondary" onclick="window.location.href='/'">
-                        <i class="fas fa-home me-2"></i>Back to Upload
-                    </button>
+            <!-- Live Stream Event Log -->
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small fw-semibold text-muted text-uppercase" style="letter-spacing: 0.05em;">
+                        <i class="fas fa-terminal me-1"></i>Live Activity Feed
+                    </span>
                 </div>
+                <div class="p-3 rounded-3" id="activityLog" 
+                     style="height: 220px; overflow-y: auto; background: #0f172a; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.7; border: 1px solid #1e293b;">
+                    <div class="text-secondary">&gt; Connecting to stream...</div>
+                </div>
+            </div>
+
+            <!-- Navigation & Complete Actions -->
+            <div class="d-flex justify-content-between align-items-center pt-2">
+                <a href="{{ url_for('index') }}" class="btn btn-modern-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>
+                    Back
+                </a>
+
+                <button class="btn btn-modern-success py-2 px-4 d-none" id="viewResultsBtn" onclick="window.location.href='/results'">
+                    <span>View Predictions</span>
+                    <i class="fas fa-arrow-right ms-2"></i>
+                </button>
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const sessionId = "{{ session_id }}";
-            const progressBar = document.getElementById('progressBar');
-            const progressText = document.getElementById('progressText');
-            const currentTask = document.getElementById('currentTask');
-            const stepInfo = document.getElementById('stepInfo');
-            const statusBadge = document.getElementById('statusBadge');
-            const statusIcon = document.getElementById('statusIcon');
-            const mainStatus = document.getElementById('mainStatus');
-            const activityLog = document.getElementById('activityLog');
-            const viewResultsBtn = document.getElementById('viewResultsBtn');
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const sessionId = "{{ session_id }}";
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const currentTask = document.getElementById('currentTask');
+    const stepInfo = document.getElementById('stepInfo');
+    const statusBadge = document.getElementById('statusBadge');
+    const statusIcon = document.getElementById('statusIcon');
+    const mainStatus = document.getElementById('mainStatus');
+    const activityLog = document.getElementById('activityLog');
+    const viewResultsBtn = document.getElementById('viewResultsBtn');
 
-            // Connect to Server-Sent Events
-            const eventSource = new EventSource(`/progress/${sessionId}`);
+    const eventSource = new EventSource(`/progress/${sessionId}`);
+    
+    eventSource.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
             
-            eventSource.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    
-                    if (data.status === 'connected') {
-                        addActivityLog('🔗 Connected to progress stream');
-                        return;
-                    }
-                    
-                    // Update progress bar
-                    if (data.progress !== undefined) {
-                        const percentage = Math.round(data.progress);
-                        progressBar.style.width = percentage + '%';
-                        progressBar.setAttribute('aria-valuenow', percentage);
-                        progressText.textContent = percentage + '%';
-                    }
-                    
-                    // Update current task
-                    if (data.current_task) {
-                        currentTask.textContent = data.current_task;
-                        stepInfo.textContent = data.current_task;
-                    }
-                    
-                    // Update activity log
-                    if (data.activity) {
-                        addActivityLog(data.activity, getActivityClass(data.activity));
-                    }
-                    
-                    // Handle completion
-                    if (data.status === 'completed') {
-                        handleCompletion(true);
-                    } else if (data.status === 'error') {
-                        handleCompletion(false, data.error);
-                    }
-                    
-                } catch (e) {
-                    console.error('Error parsing progress data:', e);
-                    addActivityLog('⚠️ Error receiving update', 'text-warning');
-                }
-            };
-            
-            eventSource.onerror = function(event) {
-                console.error('EventSource error:', event);
-                addActivityLog('❌ Connection error - retrying...', 'text-danger');
-            };
-            
-            function getActivityClass(message) {
-                if (message.includes('✅ Identified:')) {
-                    return 'text-success fw-bold';
-                } else if (message.includes('Analyzing birthday cluster')) {
-                    return 'text-info';
-                } else if (message.includes('Starting')) {
-                    return 'text-primary';
-                } else if (message.includes('❌') || message.includes('Error')) {
-                    return 'text-danger';
-                } else if (message.includes('⚠️')) {
-                    return 'text-warning';
-                }
-                return '';
+            if (data.status === 'connected') {
+                addLog('Connected to analysis pipeline');
+                return;
             }
             
-            function addActivityLog(message, className = '') {
-                // Remove "waiting" message if it exists
-                const waitingMsg = activityLog.querySelector('.text-muted.text-center');
-                if (waitingMsg) {
-                    waitingMsg.remove();
-                }
-                
-                const timestamp = new Date().toLocaleTimeString();
-                const logEntry = document.createElement('div');
-                logEntry.className = `activity-item small ${className}`;
-                logEntry.innerHTML = `<span class="text-muted">[${timestamp}]</span> ${message}`;
-                
-                activityLog.appendChild(logEntry);
-                activityLog.scrollTop = activityLog.scrollHeight;
+            if (data.progress !== undefined) {
+                const percentage = Math.round(data.progress);
+                progressBar.style.width = percentage + '%';
+                progressText.textContent = percentage + '%';
             }
             
-            function handleCompletion(success, error = null) {
-                eventSource.close();
-                
-                if (success) {
-                    // Update UI for success
-                    statusIcon.className = 'status-icon status-success';
-                    statusIcon.innerHTML = '<i class="fas fa-check"></i>';
-                    mainStatus.textContent = 'Processing Complete!';
-                    currentTask.textContent = 'All files have been analyzed successfully';
-                    statusBadge.textContent = 'Complete';
-                    statusBadge.className = 'badge bg-success';
-                    progressBar.style.width = '100%';
-                    progressText.textContent = '100%';
-                    viewResultsBtn.classList.remove('d-none');
-                    
-                    addActivityLog('🎉 Processing completed successfully!', 'text-success fw-bold');
-                    
-                    // Auto-redirect after 3 seconds
-                    setTimeout(() => {
-                        window.location.href = '/results';
-                    }, 3000);
-                    
-                } else {
-                    // Update UI for error
-                    statusIcon.className = 'status-icon status-error';
-                    statusIcon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
-                    mainStatus.textContent = 'Processing Failed';
-                    currentTask.textContent = error || 'An error occurred during processing';
-                    statusBadge.textContent = 'Failed';
-                    statusBadge.className = 'badge bg-danger';
-                    
-                    addActivityLog(`❌ Error: ${error || 'Processing failed'}`, 'text-danger fw-bold');
-                }
+            if (data.current_task) {
+                currentTask.textContent = data.current_task;
+                stepInfo.textContent = data.current_task;
             }
             
-            // Add initial activity log entry
-            addActivityLog('🚀 Starting analysis of your WhatsApp files...');
-        });
-    </script>
-</body>
-</html>
+            if (data.activity) {
+                addLog(data.activity);
+            }
+            
+            if (data.status === 'completed') {
+                handleCompletion(true);
+            } else if (data.status === 'error') {
+                handleCompletion(false, data.error);
+            }
+            
+        } catch (e) {
+            console.error('Error parsing SSE event:', e);
+        }
+    };
+
+    eventSource.onerror = function(err) {
+        console.warn('SSE stream closed or interrupted:', err);
+    };
+
+    function addLog(text) {
+        const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const entry = document.createElement('div');
+        entry.innerHTML = `<span style="color: #64748b;">[${time}]</span> ${text}`;
+        activityLog.appendChild(entry);
+        activityLog.scrollTop = activityLog.scrollHeight;
+    }
+
+    function handleCompletion(success, errorMsg) {
+        eventSource.close();
+        if (success) {
+            progressBar.style.width = '100%';
+            progressText.textContent = '100%';
+            mainStatus.textContent = 'Analysis Complete!';
+            currentTask.textContent = 'Redirecting to your birthday predictions...';
+            statusBadge.textContent = 'Ready';
+            statusBadge.className = 'fw-bold text-success';
+            statusIcon.innerHTML = '<i class="fas fa-check"></i>';
+            statusIcon.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+            viewResultsBtn.classList.remove('d-none');
+            
+            setTimeout(() => {
+                window.location.href = '/results';
+            }, 1200);
+        } else {
+            mainStatus.textContent = 'Analysis Encountered an Issue';
+            currentTask.textContent = errorMsg || 'An error occurred while parsing the chat.';
+            statusBadge.textContent = 'Failed';
+            statusBadge.className = 'fw-bold text-danger';
+            statusIcon.innerHTML = '<i class="fas fa-triangle-exclamation"></i>';
+            statusIcon.style.background = 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)';
+        }
+    }
+});
+</script>
+{% endblock %}
